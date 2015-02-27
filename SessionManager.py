@@ -64,8 +64,6 @@ import gtk
 import ctypes
 import os
 
-import gconf
-
 import signal
 
 
@@ -159,10 +157,10 @@ class XScreenSaverIdleChecker():
     def __init__(self, idle_timeout):
         self.idle_timeout = idle_timeout
         self.idle	= False
-        self.xlib	= ctypes.cdll.LoadLibrary('libX11.so')
+        self.xlib	= ctypes.cdll.LoadLibrary('libX11.so.6')
         self.dpy	= self.xlib.XOpenDisplay(os.environ['DISPLAY'])
         self.root	= self.xlib.XDefaultRootWindow(self.dpy)
-        self.xss	= ctypes.cdll.LoadLibrary('libXss.so')
+        self.xss	= ctypes.cdll.LoadLibrary('libXss.so.1')
         self.xss.XScreenSaverAllocInfo.restype \
                 = ctypes.POINTER(self.XScreenSaverInfo)
         print ("XScreenSaverIdleChecker ready with timeout %d" % idle_timeout)
@@ -175,17 +173,17 @@ class XScreenSaverIdleChecker():
 
         if idle >= self.idle_timeout:
             if not self.idle:
-                #print "Becoming idle"
+#                print "Becoming idle"
                 self.idle = True
-                self.forget_gpg_passphrases()
+#                self.forget_gpg_passphrases()
                 smp.StatusChanged(smp.PRESENCE_IDLE)
         else:
             if self.idle:
-                #print "Not idle anymore"
+#                print "Not idle anymore"
                 self.idle = False
                 smp.StatusChanged(smp.PRESENCE_AVAILABLE)
 
-        gobject.timeout_add(10000, self.check_idle, smp)
+        gobject.timeout_add(100, self.check_idle, smp)
 
     def forget_gpg_passphrases(self):
         if os.environ.has_key("GPG_AGENT_INFO"):
@@ -196,17 +194,18 @@ class XScreenSaverIdleChecker():
                 print "Can't forget GPG passphrase: %s" % e
 
 
-#gclient = gconf.client_get_default()
-#gvalue = gclient.get('/apps/gnome-screensaver/idle_delay')
-#if gvalue is not None:
-#    idle_delay = gvalue.get_int() * 60
-#else:
-#    # 5 minutes
-#    idle_delay = 600
-#
+from subprocess import Popen, PIPE 
+output = Popen(["gsettings", "get", "org.gnome.desktop.session", "idle-delay"], stdout=PIPE).communicate()[0]
+output = output.split(" ")
+if output is not None and output[1] is not None:
+    idle_delay = int(output[1])
+else:
+    # 5 minutes
+    idle_delay = 300
+
 sessmgr = SessionManager()
-#
-#xssic = XScreenSaverIdleChecker(idle_delay)
-#xssic.check_idle(sessmgr.get_smp())
+
+xssic = XScreenSaverIdleChecker(idle_delay)
+xssic.check_idle(sessmgr.get_smp())
 
 gtk.main()
